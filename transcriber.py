@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Транскрибатор: видео/аудио -> Markdown через AssemblyAI."""
-import os
-import re
 import sys
-import time
 import webbrowser
-from datetime import datetime
 from pathlib import Path
 
-import requests
+import core
+from core import KEY_URL, LANGS, MEDIA_EXT
 from PySide6.QtCore import QObject, QSettings, Qt, QThread, Signal
 from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtCore import QUrl
@@ -17,19 +14,6 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
     QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
-
-API = "https://api.assemblyai.com/v2"
-KEY_URL = "https://www.assemblyai.com/dashboard/api-keys"
-MEDIA_EXT = {
-    ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".wma", ".amr",
-    ".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v", ".flv", ".wmv", ".3gp",
-}
-LANGS = [
-    ("Определить автоматически", None), ("Русский", "ru"), ("English", "en"),
-    ("Українська", "uk"), ("Deutsch", "de"), ("Español", "es"),
-    ("Français", "fr"), ("Italiano", "it"), ("Português", "pt"),
-    ("Türkçe", "tr"), ("中文", "zh"), ("日本語", "ja"),
-]
 
 STYLE = """
 * { font-family: 'Inter', 'Noto Sans', sans-serif; font-size: 13px; color: #e8e6e1; }
@@ -70,119 +54,23 @@ QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
 """
 
 
-def fmt_ts(ms: int) -> str:
-    s = int(ms // 1000)
-    h, rem = divmod(s, 3600)
-    m, s = divmod(rem, 60)
-    return f"{h:d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-
-
-def safe_name(name: str) -> str:
-    return re.sub(r'[\\/:*?"<>|]', "_", name).strip() or "transcript"
-
-
 class Job(QObject):
     """Транскрибация одного файла (живёт в рабочем потоке)."""
-    status = Signal(str, int)   # текст, прогресс 0..100 (-1 = неопределённый)
-    done = Signal(str)          # путь к .md
+    status = Signal(str, int)
+    done = Signal(str)
     failed = Signal(str)
 
     def __init__(self, path, out_dir, key, lang, speakers, stamps):
         super().__init__()
-        self.path, self.out_dir, self.key = Path(path), Path(out_dir), key
-        self.lang, self.speakers, self.stamps = lang, speakers, stamps
+        self.args = (path, out_dir, key, lang, speakers, stamps)
         self.cancel = False
-
-    def _h(self):
-        return {"authorization": self.key}
-
-    def _check(self, r):
-        if r.status_code == 401:
-            raise RuntimeError("Неверный API-ключ. Проверьте его в настройках.")
-        if not r.ok:
-            try:
-                msg = r.json().get("error", r.text)
-            except Exception:
-                msg = r.text
-            raise RuntimeError(f"AssemblyAI {r.status_code}: {msg}")
-        return r
-
-    def _chunks(self):
-        total = self.path.stat().st_size
-        sent = 0
-        with open(self.path, "rb") as f:
-            while chunk := f.read(1 << 20):
-                if self.cancel:
-                    raise RuntimeError("Отменено")
-                sent += len(chunk)
-                self.status.emit("Загрузка файла…", int(sent / total * 50))
-                yield chunk
 
     def run(self):
         try:
-            self.status.emit("Загрузка файла…", 0)
-            r = self._check(requests.post(f"{API}/upload", headers=self._h(), data=self._chunks(), timeout=3600))
-            audio_url = r.json()["upload_url"]
-
-            body = {"audio_url": audio_url, "punctuate": True, "format_text": True,
-                    "speaker_labels": self.speakers}
-            if self.lang:
-                body["language_code"] = self.lang
-            else:
-                body["language_detection"] = True
-            r = self._check(requests.post(f"{API}/transcript", headers=self._h(), json=body, timeout=60))
-            tid = r.json()["id"]
-
-            self.status.emit("Распознавание…", 60)
-            tick = 0
-            while True:
-                if self.cancel:
-                    raise RuntimeError("Отменено")
-                data = self._check(requests.get(f"{API}/transcript/{tid}", headers=self._h(), timeout=60)).json()
-                if data["status"] == "completed":
-                    break
-                if data["status"] == "error":
-                    raise RuntimeError(data.get("error", "Ошибка распознавания"))
-                tick += 1
-                self.status.emit("Распознавание…", min(95, 60 + tick * 2))
-                time.sleep(3)
-
-            self.status.emit("Сохранение…", 98)
-            paragraphs = []
-            if not self.speakers:
-                paragraphs = self._check(requests.get(
-                    f"{API}/transcript/{tid}/paragraphs", headers=self._h(), timeout=60)).json().get("paragraphs", [])
-            md = self._markdown(data, paragraphs)
-            self.out_dir.mkdir(parents=True, exist_ok=True)
-            out = self.out_dir / f"{safe_name(self.path.stem)}.md"
-            n = 1
-            while out.exists():
-                n += 1
-                out = self.out_dir / f"{safe_name(self.path.stem)} ({n}).md"
-            out.write_text(md, encoding="utf-8")
-            self.done.emit(str(out))
+            out = core.transcribe(*self.args, self.status.emit, lambda: self.cancel)
+            self.done.emit(out)
         except Exception as e:  # noqa: BLE001
             self.failed.emit(str(e))
-
-    def _markdown(self, data, paragraphs):
-        lines = [f"# {self.path.stem}", ""]
-        meta = [f"- **Файл:** {self.path.name}"]
-        if data.get("audio_duration"):
-            meta.append(f"- **Длительность:** {fmt_ts(data['audio_duration'] * 1000)}")
-        if data.get("language_code"):
-            meta.append(f"- **Язык:** {data['language_code']}")
-        meta.append(f"- **Дата:** {datetime.now():%Y-%m-%d %H:%M}")
-        lines += meta + ["", "---", ""]
-        ts = lambda ms: f"`[{fmt_ts(ms)}]` " if self.stamps else ""  # noqa: E731
-        if self.speakers and data.get("utterances"):
-            for u in data["utterances"]:
-                lines += [f"{ts(u['start'])}**Спикер {u['speaker']}:** {u['text']}", ""]
-        elif paragraphs:
-            for p in paragraphs:
-                lines += [f"{ts(p['start'])}{p['text']}", ""]
-        else:
-            lines += [data.get("text") or "_(речь не найдена)_", ""]
-        return "\n".join(lines)
 
 
 class DropZone(QFrame):
