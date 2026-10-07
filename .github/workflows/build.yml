@@ -9,7 +9,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           pyinstaller --windowed --noconfirm --name "Транскрибатор" transcriber.py
-          cd dist && ditto -c -k --keepParent "Транскрибатор.app" ../Transkribator-mac.zip
+          if [ "$(uname -m)" = "x86_64" ]; then N=Transkribator-mac-intel.zip; else N=Transkribator-mac.zip; fi
+          cd dist && ditto -c -k --keepParent "Транскрибатор.app" "../$N"
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -30,7 +31,7 @@ jobs:
           Compress-Archive -Path dist\Transkribator -DestinationPath Transkribator-windows.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: app-${{ runner.os }}
+          name: app-${{ matrix.os }}
           path: Transkribator-*.zip
   release:
     needs: build
@@ -47,4 +48,4 @@ jobs:
           gh release delete latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
           gh release create latest dist/*.zip --repo "$GITHUB_REPOSITORY" \
             --title "Транскрибатор (Mac и Windows)" \
-            --notes "Скачайте файл для своей системы: Transkribator-mac.zip (Mac) или Transkribator-windows.zip (Windows)."
+            --notes "Mac M1 и новее: Transkribator-mac.zip. Mac на Intel (старые): Transkribator-mac-intel.zip. Windows: Transkribator-windows.zip."
