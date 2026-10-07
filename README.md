@@ -5,7 +5,8 @@
 
 ## Скачать
 Готовые программы: [Releases → latest](../../releases/latest)
-- **Mac** (Apple Silicon): `Transkribator-mac.zip`. Первый запуск: правой кнопкой → «Открыть».
+- **Mac M1 и новее** (Apple Silicon): `Transkribator-mac.zip`.
+- **Mac на Intel** (старые): `Transkribator-mac-intel.zip`. Первый запуск: правой кнопкой → «Открыть».
 - **Windows**: `Transkribator-windows.zip`, распаковать и запустить `Transkribator.exe`. Если Windows предупредит о неизвестном издателе: «Подробнее» → «Выполнить в любом случае».
 
 ## API-ключ
