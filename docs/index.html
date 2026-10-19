@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Транскрибатор</title>
+<style>
+  :root {
+    --bg: #17181a; --panel: #1f2124; --line: #2c2f33;
+    --fg: #e8e6e1; --muted: #8d9096; --accent: #d9a441;
+    --green: #7cc48a; --red: #e5736b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  label.cap { display: block; font-size: 12px; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  input[type=password], input[type=text], select {
+    width: 100%; padding: 10px 12px; font-size: 16px; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .row > div { flex: 1 1 200px; }
+  .checks { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+  .checks label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  a { color: var(--accent); }
+  #drop {
+    border: 2px dashed var(--line); border-radius: 10px; padding: 36px 16px;
+    text-align: center; cursor: pointer; color: var(--muted);
+  }
+  #drop.over { border-color: var(--accent); color: var(--fg); }
+  #drop b { color: var(--fg); }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
+    padding: 10px 18px; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  }
+  button.primary { background: var(--accent); color: #17181a; border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .item { border-top: 1px solid var(--line); padding: 12px 0; }
+  .item:first-child { border-top: 0; }
+  .item .top { display: flex; justify-content: space-between; gap: 12px; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .st.ok { color: var(--green); } .st.err { color: var(--red); white-space: normal; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button { padding: 6px 12px; font-size: 14px; }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  #empty { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Транскрибатор</h1>
+  <p class="sub">Видео или аудио → текст в Markdown. Файл уходит напрямую в AssemblyAI, у нас ничего не хранится.</p>
+
+  <div class="panel">
+    <label class="cap" for="key">API-ключ AssemblyAI</label>
+    <input id="key" type="password" placeholder="Вставьте ключ один раз, он запомнится в этом браузере" autocomplete="off">
+    <div class="hint">Свой ключ можно взять тут: <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" rel="noopener">assemblyai.com/dashboard/api-keys</a></div>
+    <div class="row" style="margin-top:14px">
+      <div>
+        <label class="cap" for="lang">Язык</label>
+        <select id="lang"></select>
+      </div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="speakers"> Разделять по спикерам</label>
+      <label><input type="checkbox" id="stamps" checked> Метки времени</label>
+    </div>
+  </div>
+
+  <div id="drop" tabindex="0">
+    <b>Перетащите файлы сюда</b> или нажмите, чтобы выбрать<br>
+    <span>mp4, mov, mkv, mp3, m4a, wav и другие</span>
+  </div>
+  <input id="file" type="file" multiple accept="audio/*,video/*,.mkv,.m4a,.opus,.amr,.flv,.wmv,.3gp" hidden>
+
+  <div class="panel" style="margin-top:16px">
+    <div id="empty">Пока ничего не добавлено.</div>
+    <div id="list"></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+const API = "https://api.assemblyai.com/v2";
+const LANGS = [
+  ["Определить автоматически", ""], ["Русский", "ru"], ["English", "en"],
+  ["Українська", "uk"], ["Deutsch", "de"], ["Español", "es"], ["Français", "fr"],
+  ["Italiano", "it"], ["Português", "pt"], ["Türkçe", "tr"], ["中文", "zh"], ["日本語", "ja"],
+];
+const $ = (id) => document.getElementById(id);
+
+// настройки живут только в этом браузере; если хранилище закрыто — работаем без него
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* без запоминания */ } },
+};
+
+for (const [name, code] of LANGS) {
+  const o = document.createElement("option");
+  o.value = code; o.textContent = name; $("lang").appendChild(o);
+}
+$("key").value = store.get("tr_key", "");
+$("lang").value = store.get("tr_lang", "");
+$("speakers").checked = store.get("tr_speakers", "0") === "1";
+$("stamps").checked = store.get("tr_stamps", "1") === "1";
+$("key").addEventListener("input", () => store.set("tr_key", $("key").value.trim()));
+$("lang").addEventListener("change", () => store.set("tr_lang", $("lang").value));
+$("speakers").addEventListener("change", () => store.set("tr_speakers", $("speakers").checked ? "1" : "0"));
+$("stamps").addEventListener("change", () => store.set("tr_stamps", $("stamps").checked ? "1" : "0"));
+
+function fmtTs(ms) {
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  const p = (n) => String(n).padStart(2, "0");
+  return h ? `${h}:${p(m)}:${p(r)}` : `${p(m)}:${p(r)}`;
+}
+function stem(name) { return name.replace(/\.[^./\\]+$/, "") || name; }
+function safeName(n) { return n.replace(/[\\/:*?"<>|]/g, "_").trim() || "transcript"; }
+
+function buildMarkdown(file, data, paragraphs, speakers, stamps) {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  const lines = [`# ${stem(file.name)}`, "", `- **Файл:** ${file.name}`];
+  if (data.audio_duration) lines.push(`- **Длительность:** ${fmtTs(data.audio_duration * 1000)}`);
+  if (data.language_code) lines.push(`- **Язык:** ${data.language_code}`);
+  lines.push(`- **Дата:** ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`, "", "---", "");
+  const ts = (ms) => (stamps ? "`[" + fmtTs(ms) + "]` " : "");
+  if (speakers && data.utterances && data.utterances.length) {
+    for (const u of data.utterances) lines.push(`${ts(u.start)}**Спикер ${u.speaker}:** ${u.text}`, "");
+  } else if (paragraphs && paragraphs.length) {
+    for (const q of paragraphs) lines.push(`${ts(q.start)}${q.text}`, "");
+  } else {
+    lines.push(data.text || "_(речь не найдена)_", "");
+  }
+  return lines.join("\n");
+}
+
+async function api(path, key, opts) {
+  let r;
+  try {
+    r = await fetch(API + path, Object.assign({ headers: { authorization: key } }, opts));
+  } catch (e) {
+    throw new Error("Нет связи с AssemblyAI. Проверьте интернет.");
+  }
+  if (r.status === 401) throw new Error("Неверный API-ключ. Проверьте его выше.");
+  if (!r.ok) {
+    let msg = "";
+    try { msg = (await r.json()).error; } catch (e) { /* не json */ }
+    throw new Error(`AssemblyAI ${r.status}${msg ? ": " + msg : ""}`);
+  }
+  return r.json();
+}
+
+function upload(file, key, onPct) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", API + "/upload");
+    x.setRequestHeader("authorization", key);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onPct(e.loaded / e.total); };
+    x.onerror = () => reject(new Error("Загрузка прервалась. Проверьте интернет."));
+    x.onload = () => {
+      if (x.status === 401) return reject(new Error("Неверный API-ключ. Проверьте его выше."));
+      if (x.status < 200 || x.status >= 300) return reject(new Error(`AssemblyAI ${x.status}: ${x.responseText.slice(0, 200)}`));
+      try { resolve(JSON.parse(x.responseText).upload_url); } catch (e) { reject(new Error("Странный ответ при загрузке.")); }
+    };
+    x.send(file);
+  });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const queue = [];
+let busy = false;
+
+function addFiles(files) {
+  for (const f of files) {
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = '<div class="top"><div class="name"></div><div class="st">В очереди</div></div><div class="bar"><i></i></div><div class="actions"></div>';
+    el.querySelector(".name").textContent = f.name;
+    $("list").appendChild(el);
+    queue.push({ file: f, el });
+  }
+  $("empty").style.display = queue.length ? "none" : "";
+  run();
+}
+
+function setState(it, text, cls, pct) {
+  const st = it.el.querySelector(".st");
+  st.textContent = text; st.className = "st" + (cls ? " " + cls : "");
+  if (pct !== undefined) it.el.querySelector(".bar i").style.width = pct + "%";
+}
+
+async function run() {
+  if (busy) return;
+  busy = true;
+  while (true) {
+    const it = queue.find((q) => !q.done);
+    if (!it) break;
+    it.done = true;
+    try { await process(it); } catch (e) { setState(it, e.message || String(e), "err"); }
+  }
+  busy = false;
+}
+
+async function process(it) {
+  const key = $("key").value.trim();
+  if (!key) throw new Error("Сначала вставьте API-ключ выше.");
+  const speakers = $("speakers").checked, stamps = $("stamps").checked, lang = $("lang").value;
+  setState(it, "Загрузка…", "", 0);
+  const url = await upload(it.file, key, (f) => setState(it, `Загрузка ${Math.round(f * 100)}%`, "", f * 50));
+  const body = { audio_url: url, punctuate: true, format_text: true, speaker_labels: speakers };
+  if (lang) body.language_code = lang; else body.language_detection = true;
+  const created = await api("/transcript", key, {
+    method: "POST", headers: { authorization: key, "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+  let tick = 0, data;
+  while (true) {
+    data = await api("/transcript/" + created.id, key);
+    if (data.status === "completed") break;
+    if (data.status === "error") throw new Error(data.error || "Ошибка распознавания");
+    tick++;
+    setState(it, "Распознавание…", "", Math.min(95, 55 + tick * 2));
+    await sleep(3000);
+  }
+  let paragraphs = [];
+  if (!speakers) paragraphs = (await api(`/transcript/${created.id}/paragraphs`, key)).paragraphs || [];
+  const md = buildMarkdown(it.file, data, paragraphs, speakers, stamps);
+  const fname = safeName(stem(it.file.name)) + ".md";
+  setState(it, "Готово", "ok", 100);
+  const act = it.el.querySelector(".actions");
+  const dl = document.createElement("button");
+  dl.className = "primary"; dl.textContent = "Скачать .md";
+  const save = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown;charset=utf-8" }));
+    a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  };
+  dl.onclick = save;
+  const cp = document.createElement("button");
+  cp.textContent = "Скопировать текст";
+  cp.onclick = async () => {
+    try { await navigator.clipboard.writeText(md); cp.textContent = "Скопировано"; }
+    catch (e) { cp.textContent = "Не вышло, скачайте файл"; }
+    setTimeout(() => { cp.textContent = "Скопировать текст"; }, 2000);
+  };
+  act.append(dl, cp);
+  save();
+}
+
+const drop = $("drop"), fileIn = $("file");
+drop.addEventListener("click", () => fileIn.click());
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } });
+fileIn.addEventListener("change", () => { addFiles([...fileIn.files]); fileIn.value = ""; });
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => addFiles([...e.dataTransfer.files]));
+// файл, брошенный мимо зоны, не должен открываться в самой вкладке и уводить со страницы
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
+</script>
+</body>
+</html>

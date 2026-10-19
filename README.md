@@ -3,7 +3,10 @@
 Видео и аудио → текст в Markdown через [AssemblyAI](https://www.assemblyai.com).
 Перетащите файл в окно, выберите папку для результатов — получите `.md`.
 
-## Скачать
+## Открыть в браузере (самый надёжный способ, особенно для Mac)
+https://velikisebastian.github.io/transcriber/ — ничего устанавливать не нужно, работает в Safari и Chrome на любом компьютере. Ключ AssemblyAI запоминается в самом браузере.
+
+## Скачать программу
 Готовые программы: [Releases → latest](../../releases/latest)
 - **Mac M1 и новее** (Apple Silicon): `Transkribator-mac.zip`.
 - **Старые Mac / Intel**: `Transkribator-mac-old.zip` (упрощённый интерфейс, запускается на старых версиях macOS). Первый запуск: правой кнопкой → «Открыть».
