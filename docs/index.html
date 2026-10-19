@@ -3,91 +3,144 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Транскрибатор</title>
+<title>WolfTranscript</title>
+<meta name="description" content="WolfTranscript: видео и аудио в текст Markdown. Перетащите файл, получите расшифровку.">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
-  :root {
-    --bg: #17181a; --panel: #1f2124; --line: #2c2f33;
-    --fg: #e8e6e1; --muted: #8d9096; --accent: #d9a441;
-    --green: #7cc48a; --red: #e5736b;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 16px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif;
-  }
-  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
-  h1 { font-size: 26px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 24px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  label.cap { display: block; font-size: 12px; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
-  input[type=password], input[type=text], select {
-    width: 100%; padding: 10px 12px; font-size: 16px; color: var(--fg);
-    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-  }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-  .row > div { flex: 1 1 200px; }
-  .checks { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
-  .checks label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
-  a { color: var(--accent); }
-  #drop {
-    border: 2px dashed var(--line); border-radius: 10px; padding: 36px 16px;
-    text-align: center; cursor: pointer; color: var(--muted);
-  }
-  #drop.over { border-color: var(--accent); color: var(--fg); }
-  #drop b { color: var(--fg); }
-  button {
-    font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
-    padding: 10px 18px; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
-  }
-  button.primary { background: var(--accent); color: #17181a; border-color: var(--accent); }
-  button:disabled { opacity: .45; cursor: default; }
-  .item { border-top: 1px solid var(--line); padding: 12px 0; }
-  .item:first-child { border-top: 0; }
-  .item .top { display: flex; justify-content: space-between; gap: 12px; }
-  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .st { color: var(--muted); font-size: 14px; white-space: nowrap; }
-  .st.ok { color: var(--green); } .st.err { color: var(--red); white-space: normal; }
-  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
-  .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .actions button { padding: 6px 12px; font-size: 14px; }
-  .hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
-  #empty { color: var(--muted); }
+@font-face{font-family:"Onest";src:url(fonts/onest-cyrillic-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Onest";src:url(fonts/onest-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Golos Text";src:url(fonts/golos-text-cyrillic-400-normal.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Golos Text";src:url(fonts/golos-text-cyrillic-500-normal.woff2) format("woff2");font-weight:500;font-display:swap;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Golos Text";src:url(fonts/golos-text-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Golos Text";src:url(fonts/golos-text-latin-500-normal.woff2) format("woff2");font-weight:500;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+:root{
+  --bg:#0a0a0a; --fg:#fafafa; --muted:rgba(250,250,250,.58); --faint:rgba(250,250,250,.38);
+  --line:rgba(250,250,250,.09); --chip:rgba(250,250,250,.22); --card:rgba(255,255,255,.035);
+  --accent:#8fb6ff; --ok:#7fc98f; --err:#e08a8a;
+  --font:"Onest","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"Golos Text","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0; background:var(--bg); color:var(--fg); font:500 15px/1.6 var(--font);
+  -webkit-font-smoothing:antialiased; position:relative; overflow-x:hidden; min-height:100vh;
+}
+/* единственное украшение: мягкое свечение в углу */
+body::before{
+  content:""; position:absolute; top:-260px; right:-220px; width:720px; height:720px; pointer-events:none;
+  background:radial-gradient(closest-side, rgba(190,215,255,.11), rgba(140,175,255,.045), transparent 72%);
+}
+.wrap{max-width:760px; margin:0 auto; padding:0 20px; position:relative}
+header{padding:26px 0 22px; position:relative}
+header img{display:block; height:30px; width:auto}
+.hline{height:1px; background:linear-gradient(90deg, rgba(143,182,255,.55), rgba(250,250,250,.09) 55%, transparent)}
+.hero{padding:64px 0 40px}
+.micro{font:600 10.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+h1{font:900 clamp(38px,7vw,60px)/1.02 var(--font); letter-spacing:-.02em; margin:16px 0 16px}
+.lead{color:var(--muted); max-width:520px; margin:0}
+section{border-top:1px solid var(--line); padding:30px 0}
+.card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px}
+.cap{display:block; font:600 10.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:10px}
+input[type=password], select{
+  width:100%; padding:12px 14px; font:500 15px var(--font); color:var(--fg);
+  background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:14px; outline:none;
+}
+input[type=password]:focus, select:focus{border-color:rgba(143,182,255,.6)}
+select{appearance:none; -webkit-appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%); background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%; background-size:5px 5px,5px 5px; background-repeat:no-repeat}
+select option{background:#141414; color:var(--fg)}
+.row{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:20px}
+@media (max-width:600px){.row{grid-template-columns:1fr}}
+.field-note{font:400 12.5px/1.5 var(--mono); color:var(--faint); margin-top:10px}
+.field-note a{color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(143,182,255,.35)}
+.checks{display:flex; gap:22px; flex-wrap:wrap; margin-top:20px}
+.checks label{display:flex; gap:10px; align-items:center; cursor:pointer; color:var(--muted); font-size:14px}
+.checks input{accent-color:#fafafa; width:16px; height:16px; margin:0}
+#drop{
+  border:1px solid var(--line); border-radius:14px; padding:46px 24px; cursor:pointer;
+  background:var(--card); transition:border-color .2s, background .2s; outline:none;
+}
+#drop:hover,#drop:focus,#drop.over{border-color:rgba(143,182,255,.6); background:rgba(143,182,255,.05)}
+#drop .big{display:block; font:800 22px/1.2 var(--font); letter-spacing:-.01em; margin-bottom:8px}
+#drop .sm{color:var(--faint); font:400 13px var(--mono)}
+button{
+  font:600 14px var(--font); cursor:pointer; border-radius:999px; padding:10px 20px;
+  background:transparent; color:var(--fg); border:1px solid var(--chip);
+}
+button:hover{border-color:var(--fg)}
+button.primary{background:#fafafa; color:#0a0a0a; border-color:#fafafa}
+button.primary:hover{background:#fff}
+#list .item{border-top:1px solid var(--line); padding:16px 0}
+#list .item:first-child{border-top:0; padding-top:0}
+.item .top{display:flex; justify-content:space-between; gap:16px; align-items:baseline}
+.name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
+.st{font:400 13px var(--mono); color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; text-align:right}
+.st.ok{color:var(--ok)} .st.err{color:var(--err); white-space:normal}
+.bar{height:2px; background:var(--line); margin-top:12px; overflow:hidden}
+.bar i{display:block; height:100%; width:0; background:var(--accent); transition:width .3s}
+.actions{margin-top:14px; display:flex; gap:10px; flex-wrap:wrap}
+.actions button{padding:8px 16px; font-size:13px}
+#empty{color:var(--faint); font:400 13px var(--mono)}
+footer{border-top:1px solid var(--line); padding:26px 0 44px; color:var(--faint); font:400 12.5px/1.7 var(--mono)}
+footer .row2{display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap}
+footer p{margin:0 0 6px}
 </style>
 </head>
 <body>
-<main>
-  <h1>Транскрибатор</h1>
-  <p class="sub">Видео или аудио → текст в Markdown. Файл уходит напрямую в AssemblyAI, у нас ничего не хранится.</p>
+<div class="wrap">
+  <header><img src="wolfteam-lockup-h-white.svg" alt="WolfTeam"></header>
+</div>
+<div class="hline"></div>
+<div class="wrap">
+  <div class="hero">
+    <div class="micro">WolfTeam · инструмент</div>
+    <h1>WolfTranscript</h1>
+    <p class="lead">Видео или аудио в текст Markdown. Перетащите файл, подождите, заберите готовую расшифровку.</p>
+  </div>
 
-  <div class="panel">
-    <label class="cap" for="key">API-ключ AssemblyAI</label>
-    <input id="key" type="password" placeholder="Вставьте ключ один раз, он запомнится в этом браузере" autocomplete="off">
-    <div class="hint">Свой ключ можно взять тут: <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" rel="noopener">assemblyai.com/dashboard/api-keys</a></div>
-    <div class="row" style="margin-top:14px">
-      <div>
-        <label class="cap" for="lang">Язык</label>
-        <select id="lang"></select>
+  <section>
+    <div class="card">
+      <label class="cap" for="key">API-ключ AssemblyAI</label>
+      <input id="key" type="password" placeholder="Вставьте ключ один раз, он запомнится в этом браузере" autocomplete="off">
+      <div class="field-note">Ключ можно взять тут: <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" rel="noopener">assemblyai.com/dashboard/api-keys</a></div>
+      <div class="row">
+        <div>
+          <label class="cap" for="lang">Язык</label>
+          <select id="lang"></select>
+        </div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="speakers"> Разделять по спикерам</label>
+        <label><input type="checkbox" id="stamps" checked> Метки времени</label>
       </div>
     </div>
-    <div class="checks">
-      <label><input type="checkbox" id="speakers"> Разделять по спикерам</label>
-      <label><input type="checkbox" id="stamps" checked> Метки времени</label>
+  </section>
+
+  <section>
+    <div id="drop" tabindex="0">
+      <span class="big">Перетащите файлы сюда</span>
+      <span class="sm">или нажмите, чтобы выбрать · mp4, mov, mkv, mp3, m4a, wav и другие</span>
     </div>
-  </div>
+    <input id="file" type="file" multiple accept="audio/*,video/*,.mkv,.m4a,.opus,.amr,.flv,.wmv,.3gp" hidden>
+  </section>
 
-  <div id="drop" tabindex="0">
-    <b>Перетащите файлы сюда</b> или нажмите, чтобы выбрать<br>
-    <span>mp4, mov, mkv, mp3, m4a, wav и другие</span>
-  </div>
-  <input id="file" type="file" multiple accept="audio/*,video/*,.mkv,.m4a,.opus,.amr,.flv,.wmv,.3gp" hidden>
-
-  <div class="panel" style="margin-top:16px">
+  <section>
+    <span class="cap">Очередь</span>
     <div id="empty">Пока ничего не добавлено.</div>
     <div id="list"></div>
-  </div>
-</main>
+  </section>
 
+  <footer>
+    <p>Файл уходит напрямую в сервис распознавания AssemblyAI. На серверах WolfTeam он не хранится, ключ остаётся в вашем браузере.</p>
+    <p>Не закрывайте вкладку, пока идёт загрузка и расшифровка.</p>
+    <div class="row2" style="margin-top:14px"><span>WolfTeam · wolfteam.one · wtl.li</span><span>WolfTranscript</span></div>
+  </footer>
+</div>
 <script>
 "use strict";
 const API = "https://api.assemblyai.com/v2";

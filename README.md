@@ -3,8 +3,8 @@
 Видео и аудио → текст в Markdown через [AssemblyAI](https://www.assemblyai.com).
 Перетащите файл в окно, выберите папку для результатов — получите `.md`.
 
-## Открыть в браузере (самый надёжный способ, особенно для Mac)
-https://velikisebastian.github.io/transcriber/ — ничего устанавливать не нужно, работает в Safari и Chrome на любом компьютере. Ключ AssemblyAI запоминается в самом браузере.
+## WolfTranscript в браузере (самый надёжный способ, особенно для Mac)
+https://transcript.wolfcollab.space/ (запасной адрес: https://velikisebastian.github.io/transcriber/) — ничего устанавливать не нужно, работает в Safari и Chrome на любом компьютере. Ключ AssemblyAI запоминается в самом браузере.
 
 ## Скачать программу
 Готовые программы: [Releases → latest](../../releases/latest)
@@ -21,3 +21,6 @@ https://velikisebastian.github.io/transcriber/ — ничего устанавл
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./run.sh
 ```
+
+## Выкладка сайта на поддомен
+`python deploy_sftp.py` (пароль SFTP берётся из `~/.wolfcollab_sftp` или переменной `WOLFCOLLAB_SFTP_PASS`, в репозитории его нет). Новая папка `sites/transcript`, существующие сайты не трогаются; обновление — с `--force`. Сертификат на поддомен выдаётся сам через 1–2 минуты после первого обращения.
