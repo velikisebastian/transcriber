@@ -64,5 +64,5 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
           gh release create latest dist/*.zip --repo "$GITHUB_REPOSITORY" \
-            --title "Транскрибатор (Mac и Windows)" \
-            --notes "Mac M1 и новее: Transkribator-mac.zip. Старые Mac (Intel): Transkribator-mac-old.zip. Windows: Transkribator-windows.zip."
+            --title "WolfTranscript: программы для Mac и Windows" \
+            --notes "Веб-версия, ничего устанавливать не нужно: https://transcript.wolfcollab.space/. Программы: Mac M1 и новее — Transkribator-mac.zip, Mac на Intel и старые версии macOS — Transkribator-mac-old.zip, Windows — Transkribator-windows.zip."
